@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Neural Network App</title>
+    <!-- Inter font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+    <!-- Tailwind CSS from CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            border-radius: 1rem;
+            border: 2px solid #D1D5DB; /* Light gray border for a soft look */
+            background-color: #F8FAFC; /* White-like canvas for drawing */
+            touch-action: none; /* Prevents mobile scrolling */
+        }
+    </style>
+</head>
+<body class="bg-blue-50 text-gray-900 flex items-center justify-center min-h-screen p-4">
+
+    <main class="bg-gray-100 rounded-2xl shadow-xl p-8 max-w-lg w-full flex flex-col items-center space-y-6">
+
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-center text-gray-800">Custom Neural Network</h1>
+        <p class="text-center text-gray-600">
+            Train a neural network to recognize circles, squares, triangles, rectangles, hexagons, trapezoids, ovals, and diamonds.
+        </p>
+
+        <!-- Status and Canvas -->
+        <div class="w-full text-center">
+            <div id="status" class="text-sm text-gray-500 font-semibold italic h-6">Model not trained.</div>
+            <canvas id="drawing-canvas" width="200" height="200" class="mt-4"></canvas>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="flex flex-col space-y-4 w-full">
+            <button id="classify-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-colors duration-200" disabled>
+                Classify Drawing
+            </button>
+            <button id="clear-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-colors duration-200">
+                Clear Canvas
+            </button>
+        </div>
+        
+    </main>
+
+    <script type="module">
+        const canvas = document.getElementById('drawing-canvas');
+        const statusDiv = document.getElementById('status');
+        const classifyBtn = document.getElementById('classify-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        const ctx = canvas.getContext('2d');
+        const IMAGE_SIZE = 28;
+        const SHAPES = ['Circle', 'Square', 'Triangle', 'Rectangle', 'Hexagon', 'Trapezoid', 'Oval', 'Diamond'];
+        
+        // Define the number of lines and corner width for each shape.
+        const SHAPE_PROPERTIES = {
+            'Circle': { lines: 0, cornerWidth: 'N/A' },
+            'Square': { lines: 4, cornerWidth: '90°' },
+            'Triangle': { lines: 3, cornerWidth: '60°' },
+            'Rectangle': { lines: 4, cornerWidth: '90°' },
+            'Hexagon': { lines: 6, cornerWidth: '120°' },
+            'Trapezoid': { lines: 4, cornerWidth: 'N/A' },
+            'Oval': { lines: 0, cornerWidth: 'N/A' },
+            'Diamond': { lines: 4, cornerWidth: 'Variable' },
+        };
+
+        let model;
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+
+        const svgData = {
+            'Circle': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2240%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Square': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20x%3D%2210%22%20y%3D%2210%22%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Triangle': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2250%2C10%2090%2C90%2010%2C90%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Rectangle': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20x%3D%2215%22%20y%3D%2225%22%20width%3D%2270%22%20height%3D%2250%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Hexagon': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2250%2C10%2090%2C30%2090%2C70%2050%2C90%2010%2C70%2010%2C30%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Trapezoid': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2220%2C10%2080%2C10%20100%2C90%200%2C90%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Oval': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2250%22%20rx%3D%2245%22%20ry%3D%2230%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+            'Diamond': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2250%2C0%20100%2C50%2050%2C100%200%2C50%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
+        };
+
+        // --- Canvas Drawing Logic ---
+        function startDrawing(e) {
+            isDrawing = true;
+            [lastX, lastY] = getCoords(e);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const [x, y] = getCoords(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.strokeStyle = '#000000'; // Black drawing color
+            ctx.lineWidth = 10;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            [lastX, lastY] = [x, y];
+        }
+
+        function getCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) {
+                return [e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top];
+            }
+            return [e.clientX - rect.left, e.clientY - rect.top];
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            draw(e);
+        }, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+        
+        // --- Model Creation and Training ---
+        function createModel() {
+            model = tf.sequential();
+            model.add(tf.layers.dense({inputShape: [IMAGE_SIZE * IMAGE_SIZE], units: 64, activation: 'relu'}));
+            model.add(tf.layers.dense({units: 64, activation: 'relu'}));
+            model.add(tf.layers.dense({units: SHAPES.length, activation: 'softmax'}));
+            
+            model.compile({
+                optimizer: tf.train.adam(),
+                loss: 'categoricalCrossentropy',
+                metrics: ['accuracy']
+            });
+            console.log('Model created and compiled.');
+        }
+
+        /**
+         * Loads and processes SVG files to create training data.
+         */
+        async function loadSVGData() {
+            statusDiv.textContent = 'Loading SVG data...';
+            const trainingData = [];
+            const labels = [];
+            // Increased the number of training examples to improve accuracy.
+            const numExamplesPerShape = 1000; 
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = IMAGE_SIZE;
+            tempCanvas.height = IMAGE_SIZE;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const loadImage = (src) => new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+
+            for (let i = 0; i < SHAPES.length; i++) {
+                const shapeName = SHAPES[i];
+                const svgUrl = 'data:image/svg+xml;base64,' + btoa(decodeURIComponent(svgData[shapeName].split('text=')[1]));
+
+                try {
+                    const img = await loadImage(svgUrl);
+                    for (let j = 0; j < numExamplesPerShape; j++) {
+                        tempCtx.clearRect(0, 0, IMAGE_SIZE, IMAGE_SIZE);
+                        const rotation = Math.random() * Math.PI * 2;
+                        tempCtx.save();
+                        tempCtx.translate(IMAGE_SIZE / 2, IMAGE_SIZE / 2);
+                        tempCtx.rotate(rotation);
+                        tempCtx.translate(-IMAGE_SIZE / 2, -IMAGE_SIZE / 2);
+                        tempCtx.drawImage(img, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
+                        tempCtx.restore();
+
+                        const imageData = tempCtx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE).data;
+                        const flattened = [];
+                        for (let k = 0; k < imageData.length; k += 4) {
+                            flattened.push(1 - (imageData[k] / 255));
+                        }
+                        trainingData.push(flattened);
+                        
+                        const label = new Array(SHAPES.length).fill(0);
+                        label[i] = 1;
+                        labels.push(label);
+                    }
+                } catch (e) {
+                    console.error('Failed to load SVG for', shapeName, e);
+                }
+            }
+
+            return { xs: tf.tensor2d(trainingData), ys: tf.tensor2d(labels) };
+        }
+
+        async function trainModel() {
+            statusDiv.textContent = 'Loading SVG data...';
+
+            const { xs, ys } = await loadSVGData();
+
+            statusDiv.textContent = 'Training model...';
+            
+            await model.fit(xs, ys, {
+                // Increased the number of epochs for more training iterations.
+                epochs: 75,
+                shuffle: true,
+                callbacks: {
+                    onEpochEnd: (epoch, logs) => {
+                        statusDiv.textContent = `Training... Epoch ${epoch + 1}/75, Loss: ${logs.loss.toFixed(4)}, Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
+                    }
+                }
+            });
+
+            xs.dispose();
+            ys.dispose();
+
+            statusDiv.textContent = 'Model training complete!';
+            classifyBtn.disabled = false;
+        }
+
+        // --- Classification Logic ---
+        async function classifyDrawing() {
+            if (!model) {
+                statusDiv.textContent = 'Please wait for the model to finish training.';
+                return;
+            }
+
+            statusDiv.textContent = 'Classifying...';
+            
+            let tensor = tf.browser.fromPixels(canvas);
+            tensor = tf.image.resizeBilinear(tensor, [IMAGE_SIZE, IMAGE_SIZE]);
+            tensor = tensor.mean(2);
+            const inputTensor = tensor.flatten().expandDims(0);
+            
+            const invertedInputTensor = tf.sub(1.0, inputTensor);
+
+            const prediction = model.predict(invertedInputTensor);
+            const values = await prediction.data();
+            const predictedClassIndex = values.indexOf(Math.max(...values));
+            
+            const result = SHAPES[predictedClassIndex];
+            const properties = SHAPE_PROPERTIES[result];
+
+            statusDiv.textContent = `Looks like a ${result} which has about ${properties.lines} lines and a corner width of ${properties.cornerWidth}!`;
+            
+            tensor.dispose();
+            invertedInputTensor.dispose();
+            prediction.dispose();
+        }
+        
+        // --- Event Listeners and Initial Setup ---
+        classifyBtn.addEventListener('click', classifyDrawing);
+        clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            statusDiv.textContent = 'Canvas cleared.';
+        });
+        
+        ctx.fillStyle = '#F8FAFC'; // Set canvas background color
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Run the main app logic
+        function runApp() {
+            createModel();
+            trainModel();
+        }
+        
+        window.onload = runApp;
+    </script>
+    
+    <!-- TensorFlow.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</body>
+</html>

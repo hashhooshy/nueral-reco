@@ -58,16 +58,16 @@
         const IMAGE_SIZE = 28;
         const SHAPES = ['Circle', 'Square', 'Triangle', 'Rectangle', 'Hexagon', 'Trapezoid', 'Oval', 'Diamond'];
         
-        // Define the number of lines and corner width for each shape.
+        // Define the number of lines for each shape.
         const SHAPE_PROPERTIES = {
-            'Circle': { lines: 0, cornerWidth: 'N/A' },
-            'Square': { lines: 4, cornerWidth: '90°' },
-            'Triangle': { lines: 3, cornerWidth: '60°' },
-            'Rectangle': { lines: 4, cornerWidth: '90°' },
-            'Hexagon': { lines: 6, cornerWidth: '120°' },
-            'Trapezoid': { lines: 4, cornerWidth: 'N/A' },
-            'Oval': { lines: 0, cornerWidth: 'N/A' },
-            'Diamond': { lines: 4, cornerWidth: 'Variable' },
+            'Circle': { lines: 0 },
+            'Square': { lines: 4 },
+            'Triangle': { lines: 3 },
+            'Rectangle': { lines: 4 },
+            'Hexagon': { lines: 6 },
+            'Trapezoid': { lines: 4 },
+            'Oval': { lines: 0 },
+            'Diamond': { lines: 4 },
         };
 
         let model;
@@ -130,8 +130,21 @@
         // --- Model Creation and Training ---
         function createModel() {
             model = tf.sequential();
-            model.add(tf.layers.dense({inputShape: [IMAGE_SIZE * IMAGE_SIZE], units: 64, activation: 'relu'}));
-            model.add(tf.layers.dense({units: 64, activation: 'relu'}));
+            // A CNN is designed for images. It uses filters to detect features like edges and corners.
+            model.add(tf.layers.conv2d({
+                inputShape: [IMAGE_SIZE, IMAGE_SIZE, 1],
+                filters: 16,
+                kernelSize: 3,
+                activation: 'relu'
+            }));
+            model.add(tf.layers.maxPooling2d({poolSize: [2, 2]}));
+            model.add(tf.layers.conv2d({
+                filters: 32,
+                kernelSize: 3,
+                activation: 'relu'
+            }));
+            model.add(tf.layers.maxPooling2d({poolSize: [2, 2]}));
+            model.add(tf.layers.flatten());
             model.add(tf.layers.dense({units: SHAPES.length, activation: 'softmax'}));
             
             model.compile({
@@ -144,13 +157,14 @@
 
         /**
          * Loads and processes SVG files to create training data.
+         * The images are now correctly reshaped for the CNN.
          */
         async function loadSVGData() {
             statusDiv.textContent = 'Loading SVG data...';
             const trainingData = [];
             const labels = [];
-            // Increased the number of training examples to improve accuracy.
-            const numExamplesPerShape = 1000; 
+            // Drastically reduced the training data since a CNN is more efficient.
+            const numExamplesPerShape = 200; 
 
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = IMAGE_SIZE;
@@ -181,11 +195,13 @@
                         tempCtx.restore();
 
                         const imageData = tempCtx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE).data;
-                        const flattened = [];
+                        const grayscale = [];
                         for (let k = 0; k < imageData.length; k += 4) {
-                            flattened.push(1 - (imageData[k] / 255));
+                            grayscale.push(1 - (imageData[k] / 255));
                         }
-                        trainingData.push(flattened);
+                        
+                        // Push the flattened grayscale array to the training data.
+                        trainingData.push(grayscale);
                         
                         const label = new Array(SHAPES.length).fill(0);
                         label[i] = 1;
@@ -195,8 +211,16 @@
                     console.error('Failed to load SVG for', shapeName, e);
                 }
             }
-
-            return { xs: tf.tensor2d(trainingData), ys: tf.tensor2d(labels) };
+            // Create a 2D tensor from the flattened data.
+            const xs = tf.tensor2d(trainingData, [trainingData.length, IMAGE_SIZE * IMAGE_SIZE]);
+            const ys = tf.tensor2d(labels);
+            
+            // Reshape the training data into a 4D tensor for the CNN: [num_examples, height, width, channels]
+            const reshapedXs = xs.reshape([trainingData.length, IMAGE_SIZE, IMAGE_SIZE, 1]);
+            
+            xs.dispose(); // Clean up the intermediate tensor.
+            
+            return { xs: reshapedXs, ys };
         }
 
         async function trainModel() {
@@ -207,12 +231,12 @@
             statusDiv.textContent = 'Training model...';
             
             await model.fit(xs, ys, {
-                // Increased the number of epochs for more training iterations.
-                epochs: 75,
+                // Reduced epochs significantly due to CNN's efficiency.
+                epochs: 20,
                 shuffle: true,
                 callbacks: {
                     onEpochEnd: (epoch, logs) => {
-                        statusDiv.textContent = `Training... Epoch ${epoch + 1}/75, Loss: ${logs.loss.toFixed(4)}, Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
+                        statusDiv.textContent = `Training... Epoch ${epoch + 1}/20, Loss: ${logs.loss.toFixed(4)}, Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
                     }
                 }
             });
@@ -236,7 +260,8 @@
             let tensor = tf.browser.fromPixels(canvas);
             tensor = tf.image.resizeBilinear(tensor, [IMAGE_SIZE, IMAGE_SIZE]);
             tensor = tensor.mean(2);
-            const inputTensor = tensor.flatten().expandDims(0);
+            // Reshape for CNN: [1, height, width, 1]
+            const inputTensor = tensor.expandDims(0).expandDims(-1);
             
             const invertedInputTensor = tf.sub(1.0, inputTensor);
 
@@ -247,7 +272,8 @@
             const result = SHAPES[predictedClassIndex];
             const properties = SHAPE_PROPERTIES[result];
 
-            statusDiv.textContent = `Looks like a ${result} which has about ${properties.lines} lines and a corner width of ${properties.cornerWidth}!`;
+            // Removed the corner width from the display message.
+            statusDiv.textContent = `Looks like a ${result} which has about ${properties.lines} lines!`;
             
             tensor.dispose();
             invertedInputTensor.dispose();

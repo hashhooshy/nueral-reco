@@ -58,32 +58,94 @@
         const IMAGE_SIZE = 28;
         const SHAPES = ['Circle', 'Square', 'Triangle', 'Rectangle', 'Hexagon', 'Trapezoid', 'Oval', 'Diamond'];
         
-        // Define the number of lines for each shape.
-        const SHAPE_PROPERTIES = {
-            'Circle': { lines: 0 },
-            'Square': { lines: 4 },
-            'Triangle': { lines: 3 },
-            'Rectangle': { lines: 4 },
-            'Hexagon': { lines: 6 },
-            'Trapezoid': { lines: 4 },
-            'Oval': { lines: 0 },
-            'Diamond': { lines: 4 },
-        };
-
         let model;
         let isDrawing = false;
         let lastX = 0, lastY = 0;
 
-        const svgData = {
-            'Circle': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2240%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Square': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20x%3D%2210%22%20y%3D%2210%22%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Triangle': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2250%2C10%2090%2C90%2010%2C90%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Rectangle': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20x%3D%2215%22%20y%3D%2225%22%20width%3D%2270%22%20height%3D%2250%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Hexagon': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2250%2C10%2090%2C30%2090%2C70%2050%2C90%2010%2C70%2010%2C30%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Trapezoid': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2220%2C10%2080%2C10%20100%2C90%200%2C90%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Oval': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2250%22%20rx%3D%2245%22%20ry%3D%2230%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-            'Diamond': 'https://placehold.co/100x100/A00000/FFFFFF?text=%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cpolygon%20points%3D%2250%2C0%20100%2C50%2050%2C100%200%2C50%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fsvg%3E',
-        };
+        /**
+         * Draws a shape on a canvas context with a given name.
+         * This function is the key to generating diverse and accurate training data.
+         * We randomize the size, position, and rotation for each shape.
+         * @param {CanvasRenderingContext2D} context The context to draw on.
+         * @param {string} shapeName The name of the shape to draw.
+         */
+        function drawShape(context, shapeName) {
+            context.fillStyle = '#FFFFFF';
+            context.fillRect(0, 0, IMAGE_SIZE, IMAGE_SIZE);
+            context.strokeStyle = '#000000';
+            context.lineWidth = 2;
+
+            const size = (Math.random() * 0.5 + 0.5) * IMAGE_SIZE * 0.8; // Random size
+            const x = Math.random() * (IMAGE_SIZE - size) + size / 2;
+            const y = Math.random() * (IMAGE_SIZE - size) + size / 2;
+            const rotation = Math.random() * Math.PI * 2;
+
+            context.save();
+            context.translate(x, y);
+            context.rotate(rotation);
+            context.translate(-x, -y);
+
+            context.beginPath();
+            switch (shapeName) {
+                case 'Circle':
+                    // Loosen the rules for circles to better represent human drawings
+                    const radius = size * 0.4;
+                    const segments = 20;
+                    context.moveTo(x + radius, y);
+                    for (let i = 1; i <= segments; i++) {
+                        const angle = i * (2 * Math.PI / segments);
+                        const wobble = Math.random() * 0.2 - 0.1; // -0.1 to 0.1
+                        const currentRadius = radius * (1 + wobble);
+                        context.lineTo(x + currentRadius * Math.cos(angle), y + currentRadius * Math.sin(angle));
+                    }
+                    context.closePath();
+                    break;
+                case 'Oval':
+                    // Made the oval drawing more distinct from the new, looser circles.
+                    context.beginPath();
+                    context.save();
+                    context.translate(x, y);
+                    context.rotate(rotation);
+                    context.scale(1, 0.7);
+                    context.arc(0, 0, size * 0.4, 0, 2 * Math.PI);
+                    context.restore();
+                    break;
+                case 'Square':
+                case 'Rectangle':
+                    context.rect(x - size / 2, y - size / 2 * (shapeName === 'Square' ? 1 : 0.7), size, size * (shapeName === 'Square' ? 1 : 0.7));
+                    break;
+                case 'Triangle':
+                    context.moveTo(x, y - size / 2);
+                    context.lineTo(x + size / 2, y + size / 2);
+                    context.lineTo(x - size / 2, y + size / 2);
+                    context.closePath();
+                    break;
+                case 'Hexagon':
+                    for (let i = 0; i < 6; i++) {
+                        context.lineTo(x + size * Math.cos(i * 2 * Math.PI / 6), y + size * Math.sin(i * 2 * Math.PI / 6));
+                    }
+                    context.closePath();
+                    break;
+                case 'Trapezoid':
+                    const topWidth = size * (0.5 + Math.random() * 0.5);
+                    const bottomWidth = size * (0.5 + Math.random() * 0.5);
+                    context.moveTo(x - topWidth / 2, y - size / 2);
+                    context.lineTo(x + topWidth / 2, y - size / 2);
+                    context.lineTo(x + bottomWidth / 2, y + size / 2);
+                    context.lineTo(x - bottomWidth / 2, y + size / 2);
+                    context.closePath();
+                    break;
+                case 'Diamond':
+                    context.moveTo(x, y - size * 0.5);
+                    context.lineTo(x + size * 0.3, y);
+                    context.lineTo(x, y + size * 0.5);
+                    context.lineTo(x - size * 0.3, y);
+                    context.closePath();
+                    break;
+            }
+            context.stroke();
+            context.restore();
+        }
 
         // --- Canvas Drawing Logic ---
         function startDrawing(e) {
@@ -156,62 +218,41 @@
         }
 
         /**
-         * Loads and processes SVG files to create training data.
-         * The images are now correctly reshaped for the CNN.
+         * Generates training data by drawing a large number of random shapes on a temporary canvas.
          */
-        async function loadSVGData() {
-            statusDiv.textContent = 'Loading SVG data...';
+        async function generateTrainingData() {
+            statusDiv.textContent = 'Generating training data...';
             const trainingData = [];
             const labels = [];
-            // Drastically reduced the training data since a CNN is more efficient.
-            const numExamplesPerShape = 200; 
+            const numExamplesPerShape = 250; 
 
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = IMAGE_SIZE;
             tempCanvas.height = IMAGE_SIZE;
             const tempCtx = tempCanvas.getContext('2d');
 
-            const loadImage = (src) => new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = reject;
-                img.src = src;
-            });
-
             for (let i = 0; i < SHAPES.length; i++) {
                 const shapeName = SHAPES[i];
-                const svgUrl = 'data:image/svg+xml;base64,' + btoa(decodeURIComponent(svgData[shapeName].split('text=')[1]));
-
-                try {
-                    const img = await loadImage(svgUrl);
-                    for (let j = 0; j < numExamplesPerShape; j++) {
-                        tempCtx.clearRect(0, 0, IMAGE_SIZE, IMAGE_SIZE);
-                        const rotation = Math.random() * Math.PI * 2;
-                        tempCtx.save();
-                        tempCtx.translate(IMAGE_SIZE / 2, IMAGE_SIZE / 2);
-                        tempCtx.rotate(rotation);
-                        tempCtx.translate(-IMAGE_SIZE / 2, -IMAGE_SIZE / 2);
-                        tempCtx.drawImage(img, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
-                        tempCtx.restore();
-
-                        const imageData = tempCtx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE).data;
-                        const grayscale = [];
-                        for (let k = 0; k < imageData.length; k += 4) {
-                            grayscale.push(1 - (imageData[k] / 255));
-                        }
-                        
-                        // Push the flattened grayscale array to the training data.
-                        trainingData.push(grayscale);
-                        
-                        const label = new Array(SHAPES.length).fill(0);
-                        label[i] = 1;
-                        labels.push(label);
+                for (let j = 0; j < numExamplesPerShape; j++) {
+                    // Draw a new random shape
+                    drawShape(tempCtx, shapeName);
+                    
+                    // Get the image data
+                    const imageData = tempCtx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE).data;
+                    const grayscale = [];
+                    for (let k = 0; k < imageData.length; k += 4) {
+                        // Invert the colors to match the drawing (black on white background)
+                        grayscale.push(imageData[k] / 255);
                     }
-                } catch (e) {
-                    console.error('Failed to load SVG for', shapeName, e);
+                    
+                    trainingData.push(grayscale);
+                    
+                    const label = new Array(SHAPES.length).fill(0);
+                    label[i] = 1;
+                    labels.push(label);
                 }
             }
-            // Create a 2D tensor from the flattened data.
+            
             const xs = tf.tensor2d(trainingData, [trainingData.length, IMAGE_SIZE * IMAGE_SIZE]);
             const ys = tf.tensor2d(labels);
             
@@ -224,19 +265,18 @@
         }
 
         async function trainModel() {
-            statusDiv.textContent = 'Loading SVG data...';
+            statusDiv.textContent = 'Generating training data...';
 
-            const { xs, ys } = await loadSVGData();
+            const { xs, ys } = await generateTrainingData();
 
             statusDiv.textContent = 'Training model...';
             
             await model.fit(xs, ys, {
-                // Reduced epochs significantly due to CNN's efficiency.
-                epochs: 20,
+                epochs: 30,
                 shuffle: true,
                 callbacks: {
                     onEpochEnd: (epoch, logs) => {
-                        statusDiv.textContent = `Training... Epoch ${epoch + 1}/20, Loss: ${logs.loss.toFixed(4)}, Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
+                        statusDiv.textContent = `Training... Epoch ${epoch + 1}/30, Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
                     }
                 }
             });
@@ -244,7 +284,7 @@
             xs.dispose();
             ys.dispose();
 
-            statusDiv.textContent = 'Model training complete!';
+            statusDiv.textContent = 'Model training complete! Now you can draw.';
             classifyBtn.disabled = false;
         }
 
@@ -259,31 +299,32 @@
             
             let tensor = tf.browser.fromPixels(canvas);
             tensor = tf.image.resizeBilinear(tensor, [IMAGE_SIZE, IMAGE_SIZE]);
-            tensor = tensor.mean(2);
-            // Reshape for CNN: [1, height, width, 1]
-            const inputTensor = tensor.expandDims(0).expandDims(-1);
+            // Convert to grayscale and normalize
+            const grayscale = tensor.mean(2).div(255);
             
-            const invertedInputTensor = tf.sub(1.0, inputTensor);
-
-            const prediction = model.predict(invertedInputTensor);
+            // Reshape for CNN: [1, height, width, 1]
+            const inputTensor = grayscale.expandDims(0).expandDims(-1);
+            
+            const prediction = model.predict(inputTensor);
             const values = await prediction.data();
             const predictedClassIndex = values.indexOf(Math.max(...values));
             
             const result = SHAPES[predictedClassIndex];
-            const properties = SHAPE_PROPERTIES[result];
 
-            // Removed the corner width from the display message.
-            statusDiv.textContent = `Looks like a ${result} which has about ${properties.lines} lines!`;
+            // Display a more direct and accurate message.
+            statusDiv.textContent = `Looks like a ${result}!`;
             
             tensor.dispose();
-            invertedInputTensor.dispose();
+            grayscale.dispose();
+            inputTensor.dispose();
             prediction.dispose();
         }
         
         // --- Event Listeners and Initial Setup ---
         classifyBtn.addEventListener('click', classifyDrawing);
         clearBtn.addEventListener('click', () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#F8FAFC'; // Reset canvas background color
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             statusDiv.textContent = 'Canvas cleared.';
         });
         
